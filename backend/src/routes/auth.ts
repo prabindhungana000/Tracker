@@ -1,5 +1,6 @@
 import express from 'express';
-import { Prisma, PrismaClientKnownRequestError } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+const { PrismaClientKnownRequestError } = Prisma;
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
