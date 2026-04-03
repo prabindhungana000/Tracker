@@ -1,0 +1,262 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User Profile and Authentication
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  username      String     @unique
+  passwordHash  String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Profile
+  profile       Profile?
+  
+  // Meal Logging
+  meals         Meal[]
+  trackerState  TrackerState?
+  
+  // Gamification
+  level         Int        @default(1)
+  totalFlavorScore Float    @default(0)
+  currentStreak Int        @default(0)
+  longestStreak Int        @default(0)
+  lastMealDate  DateTime?
+  
+  // Social
+  createdQuests Quest[]
+  questProgress QuestProgress[]
+  achievements  Achievement[]
+  friends       User[]     @relation("Friends")
+  friendsOf     User[]     @relation("Friends")
+  challengeParticipations ChallengeParticipation[]
+  
+  // Tokens & Sessions
+  refreshTokens RefreshToken[]
+}
+
+model Profile {
+  id            String     @id @default(cuid())
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  avatar        String?
+  bio           String?
+  dietaryRestrictions String // JSON string array
+  cuisinePreferences String // JSON string array
+  environmentalPriority Int @default(50) // 0-100 scale
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+// Meal Logging
+model Meal {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  mealName      String
+  description   String?
+  imageUrl      String?
+  
+  // Nutritional Data
+  calories      Float
+  protein       Float      @default(0) // grams
+  carbs         Float      @default(0)
+  fat           Float      @default(0)
+  fiber         Float      @default(0)
+  
+  // Meal Properties
+  cuisineType   String     // e.g., "Italian", "Asian", "Mediterranean"
+  mealType      String     // "breakfast", "lunch", "dinner", "snack"
+  mood          String?    // How they felt when eating
+  location      String?    // Where they ate
+  
+  // AI Recognition
+  recognizedItems String @default("[]") // JSON string array of items identified by AI
+  confidence    Float      @default(0)  // Confidence level of AI recognition
+  
+  // Flavor Score Components
+  nutritionScore Float     @default(0)
+  tasteScore    Float      @default(0)
+  sustainabilityScore Float @default(0)
+  flavorScore   Float      @default(0)
+  
+  // Environmental
+  carbonFootprint Float    @default(0) // kg CO2
+  
+  createdAt     DateTime   @default(now())
+  loggedAt      DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  @@index([userId, loggedAt])
+}
+
+model TrackerState {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  goal          Int?
+  burnGoal      Int?
+  weightKg      Float    @default(70)
+  mealsJson     String   @default("[]")
+  burnsJson     String   @default("[]")
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Gamification: Quests
+model Quest {
+  id            String     @id @default(cuid())
+  creatorId     String
+  creator       User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  name          String
+  description   String
+  icon          String?    // emoji or icon code
+  
+  // Quest Type
+  type          String     // "cuisine_master", "diet_explorer", "sustainable_eater", etc.
+  target        String?    // Specific goal (e.g., "Italian" for cuisine_master)
+  targetCount   Int        @default(5) // How many to complete
+  
+  // Rewards
+  flavorPointReward Int    @default(100)
+  xpReward      Int        @default(50)
+  
+  // Timeline
+  startDate     DateTime   @default(now())
+  endDate       DateTime?  // null = ongoing
+  
+  // Progress
+  participants  QuestProgress[]
+  
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+}
+
+model QuestProgress {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId       String
+  quest         Quest      @relation(fields: [questId], references: [id], onDelete: Cascade)
+  
+  progress      Int        @default(0)
+  completed     Boolean    @default(false)
+  completedAt   DateTime?
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  
+  @@unique([userId, questId])
+}
+
+// Achievements / Badges
+model Achievement {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  icon          String     // emoji
+  title         String
+  description   String
+  type          String     // "milestone", "quest_complete", "streak", "social", etc.
+  
+  unlockedAt    DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  
+  @@index([userId, type])
+}
+
+// Social: Challenges
+model Challenge {
+  id            String     @id @default(cuid())
+  name          String
+  description   String
+  icon          String?
+  
+  // Challenge Details
+  type          String     // "weekly_cuisine", "month_sustainable", "friends_battle", etc.
+  theme         String?    // The specific theme (e.g., "Vegan", "Japanese", "Local Only")
+  
+  // Timeline
+  startDate     DateTime
+  endDate       DateTime
+  
+  // Scoring
+  metric        String     @default("flavorScore") // What to track
+  
+  participants  ChallengeParticipation[]
+  
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+}
+
+model ChallengeParticipation {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId   String
+  challenge     Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  
+  score         Float      @default(0)
+  rank          Int?
+  
+  joinedAt      DateTime   @default(now())
+  
+  @@unique([userId, challengeId])
+}
+
+// AI Meal Recognition Cache
+model MealRecognitionCache {
+  id            String     @id @default(cuid())
+  imageHash     String     @unique
+  
+  recognizedItems String // JSON string array
+  confidence    Float
+  
+  nutritionData String    // JSON string of cached nutrition estimation
+  
+  createdAt     DateTime   @default(now())
+  expiresAt     DateTime   @default(now())
+}
+
+// User Sessions
+model RefreshToken {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token         String     @unique
+  expiresAt     DateTime
+  
+  createdAt     DateTime   @default(now())
+  revokedAt     DateTime?
+}
+
+// Leaderboard (Computed)
+model LeaderboardEntry {
+  id            String     @id @default(cuid())
+  userId        String     @unique
+  
+  // Different leaderboards
+  overallRank   Int
+  flavorScoreRank Int
+  
+  totalMeals    Int        @default(0)
+  totalFlavorScore Float   @default(0)
+  currentStreak Int        @default(0)
+  
+  updatedAt     DateTime   @updatedAt
+}

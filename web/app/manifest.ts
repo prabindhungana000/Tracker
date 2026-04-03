@@ -1,0 +1,20 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "Calorie Balance Tracker",
+    short_name: "CalorieTracker",
+    description: "Track food calories, calories burned, and your daily net balance.",
+    start_url: "/auth",
+    display: "standalone",
+    background_color: "#f4efe7",
+    theme_color: "#22473d",
+    icons: [
+      {
+        src: "/favicon.ico",
+        sizes: "any",
+        type: "image/x-icon",
+      },
+    ],
+  };
+}

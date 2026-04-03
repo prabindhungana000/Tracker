@@ -1,0 +1,26 @@
+{
+  "name": "foodjourney",
+  "version": "0.1.0",
+  "description": "A unique culinary adventure food tracking app with gamification, AI recognition, and social features",
+  "private": true,
+  "scripts": {
+    "dev:web": "cd web && npm run dev",
+    "dev:mobile": "cd mobile && expo start",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently \"npm run dev:web\" \"npm run dev:backend\"",
+    "build:web": "cd web && npm run build",
+    "build:mobile": "cd mobile && expo build",
+    "build:backend": "cd backend && npm run build",
+    "test": "concurrently \"cd web && npm test\" \"cd backend && npm test\"",
+    "lint": "concurrently \"cd web && npm run lint\" \"cd backend && npm run lint\" \"cd mobile && npm run lint\"",
+    "install:all": "npm install && cd web && npm install && cd ../mobile && npm install && cd ../backend && npm install"
+  },
+  "workspaces": [
+    "web",
+    "backend",
+    "shared"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

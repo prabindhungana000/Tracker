@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "FoodJourney",
+    "slug": "foodjourney",
+    "version": "0.1.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow FoodJourney to access your photos to recognize meals",
+          "cameraPermission": "Allow FoodJourney to access your camera to take meal photos"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow FoodJourney to access your camera"
+        }
+      ]
+    ],
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F3EF"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "jsEngine": "hermes",
+    "platforms": [
+      "ios",
+      "android"
+    ]
+  }
+}
