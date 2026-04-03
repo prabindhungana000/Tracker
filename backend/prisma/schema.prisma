@@ -10,9 +10,10 @@ generator client {
 // User Profile and Authentication
 model User {
   id            String     @id @default(cuid())
+  supabaseUserId String?   @unique
   email         String     @unique
   username      String     @unique
-  passwordHash  String
+  passwordHash  String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

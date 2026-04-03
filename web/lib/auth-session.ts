@@ -42,6 +42,22 @@ export function setAuthSession(session: AuthSession) {
   window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
 }
 
+export function updateAuthSessionToken(token: string) {
+  const session = readAuthSession();
+
+  if (!session) {
+    return null;
+  }
+
+  const nextSession = {
+    ...session,
+    token,
+  };
+
+  setAuthSession(nextSession);
+  return nextSession;
+}
+
 export function clearAuthSession() {
   if (typeof window === "undefined") {
     return;

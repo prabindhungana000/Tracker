@@ -27,13 +27,16 @@
    cp backend/.env.example backend/.env
    
    # Update backend/.env with:
-   DATABASE_URL=postgresql://user:password@localhost:5432/foodjourney
-   JWT_SECRET=your-secret-key
+   DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.your-project.supabase.co:5432/postgres
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_ANON_KEY=your-supabase-anon-key
    GOOGLE_VISION_API_KEY=your-api-key
    
    # Frontend
    cp web/.env.example web/.env.local
    NEXT_PUBLIC_API_URL=http://localhost:3001
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    ```
 
 4. **Initialize database**
@@ -318,6 +321,9 @@ chore/      - Maintenance tasks
 ```bash
 npm run build:web
 # Set environment variables in Vercel dashboard
+# NEXT_PUBLIC_API_URL
+# NEXT_PUBLIC_SUPABASE_URL
+# NEXT_PUBLIC_SUPABASE_ANON_KEY
 # Auto-deploy from GitHub
 ```
 

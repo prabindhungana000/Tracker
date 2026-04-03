@@ -1,4 +1,3 @@
-import { calculateLevel } from './gamification';
 import prisma from '../lib/prisma';
 
 /**
@@ -335,7 +334,7 @@ export class SocialService {
   /**
    * Update leaderboard entry (called after meal logging)
    */
-  async updateLeaderboardEntry(userId: string) {
+  async updateLeaderboardEntry(_userId: string) {
     // Leaderboard is now calculated dynamically from User model
     // No need to store separate leaderboard entries
     return;

@@ -128,11 +128,11 @@ FoodJourney/
 | **Backend** | Node.js, Express, TypeScript |
 | **Database** | PostgreSQL, Prisma ORM |
 | **AI/ML** | Google Vision API for meal recognition |
-| **Auth** | JWT + bcrypt |
+| **Auth** | Supabase Auth (GitHub + email/password) |
 | **Real-time** | Socket.io for social features |
 | **Styling** | Tailwind CSS + custom design system |
 | **Testing** | Jest, React Testing Library |
-| **Deployment** | Docker, AWS/Vercel |
+| **Deployment** | Vercel (web), Supabase (Postgres/Auth), Docker/Railway/AWS (API) |
 
 ## 📊 Key Data Models
 
@@ -190,9 +190,8 @@ FoodJourney/
 
 ```
 # Auth
-POST   /api/auth/register
-POST   /api/auth/login
-POST   /api/auth/refresh
+GET    /api/auth/me
+GET    /api/auth/providers
 
 # Meals
 POST   /api/meals
@@ -234,9 +233,13 @@ GET    /api/user/analytics
 # Install all dependencies
 npm run install:all
 
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your database and API credentials
+# Configure backend env
+cp backend/.env.example backend/.env
+
+# Configure web env
+cp web/.env.example web/.env.local
+
+# Edit both files with your Supabase project values
 
 # Run migrations
 cd backend && npm run migrate

@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 /**
@@ -79,7 +79,7 @@ export function MobileButton({
  */
 
 interface MobileCardProps {
-  children: React.ReactNode;
+  children: ReactNode;
   onPress?: () => void;
 }
 

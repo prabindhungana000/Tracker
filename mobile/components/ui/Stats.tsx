@@ -1,4 +1,3 @@
-import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 /**
@@ -80,8 +79,6 @@ export function MobileProgressRing({
   label,
   size = 100,
 }: MobileProgressRingProps) {
-  const percentage = (value / max) * 100;
-
   return (
     <View style={progressStyles.container}>
       <View

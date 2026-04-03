@@ -7,16 +7,23 @@
 npm run install:all
 ```
 
-### 2️⃣ Configure Database
+### 2️⃣ Configure Supabase + Vercel Env
 ```bash
-# Copy environment template
+# Backend env
 cp backend/.env.example backend/.env
+cp web/.env.example web/.env.local
 
 # Edit backend/.env and add:
-DATABASE_URL=postgresql://user:password@localhost:5432/foodjourney
-JWT_SECRET=your-super-secret-key-min-32-chars
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.your-project.supabase.co:5432/postgres
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
 GOOGLE_VISION_API_KEY=your-key-optional
 FRONTEND_URL=http://localhost:3000
+
+# Edit web/.env.local and add:
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 ### 3️⃣ Initialize Database
@@ -115,12 +122,11 @@ await prisma.questProgress.create({
 ## 🎯 Implementation Checklist
 
 ### Phase 2A: Authentication (2-3 days)
-- [ ] Implement `POST /api/auth/register`
-- [ ] Implement `POST /api/auth/login`
-- [ ] Implement `POST /api/auth/refresh`
-- [ ] Add password hashing with bcrypt
-- [ ] Generate JWT tokens
-- [ ] Create login form (web)
+- [x] Link Supabase Auth to the web app
+- [x] Add GitHub OAuth sign-in
+- [x] Add email/password auth through Supabase
+- [x] Sync Supabase sessions with backend users
+- [x] Create login form (web)
 - [ ] Create signup screen (mobile)
 
 ### Phase 2B: Meal Logging (3-4 days)

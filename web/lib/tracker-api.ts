@@ -1,3 +1,5 @@
+import { getAccessToken } from "./auth-api";
+
 type TrackerMealEntry = {
   id: string;
   name: string;
@@ -45,19 +47,25 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 async function performTrackerRequest(
   path: "",
-  token: string,
+  token?: string,
   options?: {
     method?: "GET" | "PUT";
     body?: TrackerPayload;
   },
 ) {
+  const accessToken = await getAccessToken(token);
+
+  if (!accessToken) {
+    throw new TrackerApiError("Your session has expired. Please sign in again.");
+  }
+
   let response: Response;
 
   try {
     response = await fetch(`${API_BASE_URL}/api/tracker${path}`, {
       method: options?.method || "GET",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
       body: options?.body ? JSON.stringify(options.body) : undefined,

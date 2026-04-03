@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import prisma from '../lib/prisma';
+import { hasSupabaseServerConfig } from '../lib/supabase';
 import {
   authMiddleware,
   type AuthTokenPayload,
@@ -34,6 +35,7 @@ function createAuthToken(user: {
   id: string;
   email: string;
   username: string;
+  supabaseUserId?: string | null;
 }) {
   const expiresIn = (
     process.env.JWT_EXPIRES_IN || '7d'
@@ -44,6 +46,7 @@ function createAuthToken(user: {
       userId: user.id,
       email: user.email,
       username: user.username,
+      supabaseUserId: user.supabaseUserId || undefined,
     },
     process.env.JWT_SECRET || 'secret',
     {
@@ -88,6 +91,17 @@ function getUniqueFieldError(error: any) {
     error: 'That account already exists.',
   };
 }
+
+router.get('/providers', async (_req, res) => {
+  return res.json({
+    success: true,
+    data: {
+      provider: hasSupabaseServerConfig() ? 'supabase' : 'legacy',
+      github: hasSupabaseServerConfig(),
+      emailPassword: true,
+    },
+  });
+});
 
 router.post('/register', validateRequest(registerSchema), async (req, res) => {
   const email = normalizeEmail(req.body.email);
@@ -134,6 +148,7 @@ router.post('/register', validateRequest(registerSchema), async (req, res) => {
         email: true,
         username: true,
         createdAt: true,
+        supabaseUserId: true,
       },
     });
 
@@ -145,9 +160,7 @@ router.post('/register', validateRequest(registerSchema), async (req, res) => {
       },
     });
   } catch (error: any) {
-    if (
-      error?.code === 'P2002'
-    ) {
+    if (error?.code === 'P2002') {
       const duplicate = getUniqueFieldError(error);
 
       return res.status(409).json({
@@ -178,10 +191,11 @@ router.post('/login', validateRequest(loginSchema), async (req, res) => {
         username: true,
         createdAt: true,
         passwordHash: true,
+        supabaseUserId: true,
       },
     });
 
-    if (!user) {
+    if (!user || !user.passwordHash) {
       return res.status(401).json({
         success: false,
         error: 'Invalid email or password.',

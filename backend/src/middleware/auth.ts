@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+import { authenticateAccessToken } from '../services/authUsers';
+import { hasSupabaseServerConfig } from '../lib/supabase';
+
 export interface AuthTokenPayload extends jwt.JwtPayload {
   userId: string;
   email: string;
   username: string;
+  supabaseUserId?: string;
 }
 
 declare global {
@@ -23,8 +27,25 @@ function readBearerToken(authorization?: string) {
   return authorization.slice('Bearer '.length).trim();
 }
 
+function readLegacyToken(token: string) {
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'secret'
+    ) as AuthTokenPayload | string;
+
+    if (typeof decoded === 'string' || !decoded.userId) {
+      return null;
+    }
+
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Verify JWT token and attach user to request
+ * Verify Supabase access token and attach the linked app user to the request.
  */
 export async function authMiddleware(
   req: Request,
@@ -41,21 +62,25 @@ export async function authMiddleware(
       });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'secret'
-    ) as AuthTokenPayload | string;
+    const legacyUser = readLegacyToken(token);
 
-    if (typeof decoded === 'string' || !decoded.userId) {
+    if (legacyUser) {
+      req.user = legacyUser;
+      next();
+      return;
+    }
+
+    if (!hasSupabaseServerConfig()) {
       return res.status(401).json({
         success: false,
         error: 'Invalid or expired token',
       });
     }
 
-    req.user = decoded;
+    req.user = await authenticateAccessToken(token);
     next();
   } catch (error) {
+    console.error('Auth middleware error:', error);
     return res.status(401).json({
       success: false,
       error: 'Invalid or expired token',
@@ -75,17 +100,16 @@ export async function optionalAuthMiddleware(
     const token = readBearerToken(req.headers.authorization);
 
     if (token) {
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET || 'secret'
-      ) as AuthTokenPayload | string;
+      const legacyUser = readLegacyToken(token);
 
-      if (typeof decoded !== 'string' && decoded.userId) {
-        req.user = decoded;
+      if (legacyUser) {
+        req.user = legacyUser;
+      } else if (hasSupabaseServerConfig()) {
+        req.user = await authenticateAccessToken(token);
       }
     }
   } catch (error) {
-    // Silently fail - user will be undefined
+    // Silently fail - user will stay undefined
   }
 
   next();

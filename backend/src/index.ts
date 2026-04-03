@@ -5,6 +5,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 
 import authRoutes from './routes/auth';
+import socialRoutes from './routes/social';
 import trackerRoutes from './routes/tracker';
 
 dotenv.config();
@@ -48,6 +49,7 @@ app.get('/api', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tracker', trackerRoutes);
+app.use('/api/social', socialRoutes);
 
 // Socket.io Real-time Features
 io.on('connection', (socket) => {
@@ -67,7 +69,7 @@ io.on('connection', (socket) => {
 });
 
 // Error Handling
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });

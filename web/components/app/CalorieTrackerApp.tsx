@@ -4,8 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { ACTIVITY_CATALOG } from "../../lib/activity-catalog";
-import { clearAuthSession, readAuthSession, type AuthSession } from "../../lib/auth-session";
+import {
+  signOutFromApp,
+  subscribeToAuthChanges,
+  syncAuthSession,
+} from "../../lib/auth-api";
+import { readAuthSession, type AuthSession } from "../../lib/auth-session";
 import { FOOD_CATALOG, FOOD_CATEGORIES, type FoodItem } from "../../lib/food-catalog";
+import { hasSupabaseBrowserConfig } from "../../lib/supabase-browser";
 import {
   fetchTrackerSnapshot,
   saveTrackerSnapshot,
@@ -292,6 +298,7 @@ function ExitIcon() {
 
 export function CalorieTrackerApp() {
   const router = useRouter();
+  const hasSupabaseConfig = hasSupabaseBrowserConfig();
   const [session, setSession] = useState<AuthSession | null>(null);
   const [ready, setReady] = useState(false);
   const [state, setState] = useState<TrackerState>(DEFAULT_STATE);
@@ -328,25 +335,87 @@ export function CalorieTrackerApp() {
   const skipNextSaveRef = useRef(false);
   const saveRequestIdRef = useRef(0);
   const syncErrorLoggedRef = useRef(false);
+  const sessionUserId = session?.user.id ?? null;
+  const sessionToken = session?.token ?? null;
 
   useEffect(() => {
-    const nextSession = readAuthSession();
+    const storedSession = readAuthSession();
 
-    if (!nextSession) {
-      router.replace("/auth");
+    if (storedSession) {
+      setSession(storedSession);
+      setReady(true);
+    }
+
+    if (!hasSupabaseConfig) {
+      if (!storedSession) {
+        setReady(true);
+        router.replace("/auth");
+      }
+
       return;
     }
 
-    setSession(nextSession);
-    setReady(true);
-  }, [router]);
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        const syncedSession = await syncAuthSession();
+
+        if (!active) {
+          return;
+        }
+
+        if (!syncedSession) {
+          setSession(null);
+          setReady(true);
+          router.replace("/auth");
+          return;
+        }
+
+        setSession(syncedSession);
+        setReady(true);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        if (!storedSession) {
+          console.error("Session restore error:", error);
+          setReady(true);
+          router.replace("/auth");
+        }
+      }
+    }
+
+    void restoreSession();
+    const unsubscribe = subscribeToAuthChanges((nextSession) => {
+      if (!active) {
+        return;
+      }
+
+      if (!nextSession) {
+        setSession(null);
+        setReady(true);
+        router.replace("/auth");
+        return;
+      }
+
+      setSession(nextSession);
+      setReady(true);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [hasSupabaseConfig, router]);
 
   useEffect(() => {
-    if (!session) {
+    if (!sessionUserId) {
       return;
     }
 
-    const stored = readState(session.user.id);
+    const stored = readState(sessionUserId);
     const restoredState = stored || DEFAULT_STATE;
     const serializedPayload = serializeTrackerPayload(trackerPayloadFromState(restoredState));
 
@@ -357,19 +426,19 @@ export function CalorieTrackerApp() {
     setHasRemoteLoaded(false);
     setState(restoredState);
     setLoaded(true);
-  }, [session]);
+  }, [sessionUserId]);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
   useEffect(() => {
-    if (!loaded || !session || typeof window === "undefined") {
+    if (!loaded || !sessionUserId || typeof window === "undefined") {
       return;
     }
 
-    window.localStorage.setItem(getStorageKey(session.user.id), JSON.stringify(state));
-  }, [loaded, session, state]);
+    window.localStorage.setItem(getStorageKey(sessionUserId), JSON.stringify(state));
+  }, [loaded, sessionUserId, state]);
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -532,16 +601,16 @@ export function CalorieTrackerApp() {
   }, [isActivityPickerOpen]);
 
   useEffect(() => {
-    if (!loaded || !session) {
+    if (!loaded || !sessionToken) {
       return;
     }
 
-    const sessionToken = session.token;
+    const activeSessionToken = sessionToken;
     let cancelled = false;
 
     async function syncFromServer() {
       try {
-        const snapshot = await fetchTrackerSnapshot(sessionToken);
+        const snapshot = await fetchTrackerSnapshot(activeSessionToken);
 
         if (cancelled) {
           return;
@@ -592,14 +661,14 @@ export function CalorieTrackerApp() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [loaded, session]);
+  }, [loaded, sessionToken]);
 
   useEffect(() => {
-    if (!loaded || !session || !hasRemoteLoaded) {
+    if (!loaded || !sessionToken || !hasRemoteLoaded) {
       return;
     }
 
-    const sessionToken = session.token;
+    const activeSessionToken = sessionToken;
     const payload = trackerPayloadFromState(state);
     const serializedPayload = serializeTrackerPayload(payload);
 
@@ -619,7 +688,7 @@ export function CalorieTrackerApp() {
 
     async function persistState() {
       try {
-        const snapshot = await saveTrackerSnapshot(sessionToken, payload);
+        const snapshot = await saveTrackerSnapshot(activeSessionToken, payload);
 
         if (cancelled || requestId !== saveRequestIdRef.current) {
           return;
@@ -648,7 +717,7 @@ export function CalorieTrackerApp() {
     return () => {
       cancelled = true;
     };
-  }, [hasRemoteLoaded, loaded, session, state]);
+  }, [hasRemoteLoaded, loaded, sessionToken, state]);
 
   function applyRemoteSnapshot(snapshot: TrackerSnapshot) {
     const nextState = trackerStateFromSnapshot(snapshot);
@@ -880,8 +949,13 @@ export function CalorieTrackerApp() {
     setBurnError("");
   }
 
-  function handleLogout() {
-    clearAuthSession();
+  async function handleLogout() {
+    try {
+      await signOutFromApp();
+    } catch (error) {
+      console.error("Sign-out error:", error);
+    }
+
     router.replace("/auth");
   }
 
@@ -1507,6 +1581,7 @@ export function CalorieTrackerApp() {
               <label className="field field--full">
                 <span>Search activity</span>
                 <input
+                  role="combobox"
                   value={activityQuery}
                   onFocus={openActivityPicker}
                   onChange={(event) => {
@@ -1515,13 +1590,15 @@ export function CalorieTrackerApp() {
                   }}
                   placeholder="Search walking, running, yoga..."
                   autoComplete="off"
+                  aria-autocomplete="list"
+                  aria-haspopup="listbox"
                   aria-expanded={isActivityPickerOpen}
                   aria-controls="activity-results"
                 />
               </label>
 
               {isActivityPickerOpen ? (
-                <div id="activity-results" className="activity-results">
+                <div id="activity-results" className="activity-results" role="listbox">
                   {filteredActivities.length > 0 ? (
                     filteredActivities.map((activity) => (
                       <button

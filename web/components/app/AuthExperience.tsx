@@ -3,11 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
-import { AuthApiError, signInWithEmail, signUpWithEmail } from "../../lib/auth-api";
-import { readAuthSession, setAuthSession } from "../../lib/auth-session";
+import {
+  AuthApiError,
+  signInWithEmail,
+  signUpWithEmail,
+  subscribeToAuthChanges,
+  syncAuthSession,
+} from "../../lib/auth-api";
+import { readAuthSession } from "../../lib/auth-session";
+import { hasSupabaseBrowserConfig } from "../../lib/supabase-browser";
 
 type AuthMode = "signin" | "signup";
-type AuthErrors = Partial<Record<"username" | "email" | "password" | "confirmPassword" | "form", string>>;
+type AuthErrors = Partial<
+  Record<"username" | "email" | "password" | "confirmPassword" | "form", string>
+>;
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -90,12 +99,44 @@ export function AuthExperience() {
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const hasSupabaseConfig = hasSupabaseBrowserConfig();
 
   useEffect(() => {
     if (readAuthSession()) {
       router.replace("/app");
+      return;
     }
-  }, [router]);
+
+    if (!hasSupabaseConfig) {
+      return;
+    }
+
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        const session = await syncAuthSession();
+
+        if (active && session) {
+          router.replace("/app");
+        }
+      } catch {
+        // The auth form is still usable even if session restore fails.
+      }
+    }
+
+    void restoreSession();
+    const unsubscribe = subscribeToAuthChanges((session) => {
+      if (active && session) {
+        router.replace("/app");
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [hasSupabaseConfig, router]);
 
   function applyApiError(error: unknown) {
     if (error instanceof AuthApiError) {
@@ -134,8 +175,7 @@ export function AuthExperience() {
     setSuccessMessage("");
 
     try {
-      const session = await signInWithEmail(normalizeEmail(signIn.email), signIn.password);
-      setAuthSession(session);
+      await signInWithEmail(normalizeEmail(signIn.email), signIn.password);
       router.replace("/app");
     } catch (error) {
       applyApiError(error);
@@ -175,11 +215,16 @@ export function AuthExperience() {
     setSuccessMessage("");
 
     try {
-      await signUpWithEmail(
+      const result = await signUpWithEmail(
         signUp.username.trim(),
         normalizeEmail(signUp.email),
         signUp.password,
       );
+
+      if (result.session) {
+        router.replace("/app");
+        return;
+      }
 
       setMode("signin");
       setSignIn({
@@ -193,7 +238,9 @@ export function AuthExperience() {
         confirmPassword: "",
       });
       setErrors({});
-      setSuccessMessage("Account created. Please sign in with your email and password.");
+      setSuccessMessage(
+        result.message || "Account created. Please sign in with your email and password.",
+      );
     } catch (error) {
       applyApiError(error);
     } finally {
@@ -263,8 +310,11 @@ export function AuthExperience() {
                 <input
                   type="email"
                   value={signIn.email}
-                  onChange={(event) => setSignIn((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) =>
+                    setSignIn((current) => ({ ...current, email: event.target.value }))
+                  }
                   placeholder="you@example.com"
+                  autoComplete="email"
                 />
                 {errors.email ? <p className="field-error">{errors.email}</p> : null}
               </label>
@@ -275,8 +325,11 @@ export function AuthExperience() {
                   <input
                     type={showSignInPassword ? "text" : "password"}
                     value={signIn.password}
-                    onChange={(event) => setSignIn((current) => ({ ...current, password: event.target.value }))}
+                    onChange={(event) =>
+                      setSignIn((current) => ({ ...current, password: event.target.value }))
+                    }
                     placeholder="Enter your password"
+                    autoComplete="current-password"
                   />
                   <button
                     type="button"
@@ -292,7 +345,11 @@ export function AuthExperience() {
 
               {errors.form ? <p className="auth-error-banner">{errors.form}</p> : null}
 
-              <button type="submit" className="primary-button primary-button--full" disabled={isSubmitting}>
+              <button
+                type="submit"
+                className="primary-button primary-button--full"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </button>
             </form>
@@ -302,8 +359,11 @@ export function AuthExperience() {
                 <span>Username</span>
                 <input
                   value={signUp.username}
-                  onChange={(event) => setSignUp((current) => ({ ...current, username: event.target.value }))}
+                  onChange={(event) =>
+                    setSignUp((current) => ({ ...current, username: event.target.value }))
+                  }
                   placeholder="Choose a username"
+                  autoComplete="username"
                 />
                 {errors.username ? <p className="field-error">{errors.username}</p> : null}
               </label>
@@ -313,8 +373,11 @@ export function AuthExperience() {
                 <input
                   type="email"
                   value={signUp.email}
-                  onChange={(event) => setSignUp((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) =>
+                    setSignUp((current) => ({ ...current, email: event.target.value }))
+                  }
                   placeholder="you@example.com"
+                  autoComplete="email"
                 />
                 {errors.email ? <p className="field-error">{errors.email}</p> : null}
               </label>
@@ -325,8 +388,11 @@ export function AuthExperience() {
                   <input
                     type={showSignUpPassword ? "text" : "password"}
                     value={signUp.password}
-                    onChange={(event) => setSignUp((current) => ({ ...current, password: event.target.value }))}
+                    onChange={(event) =>
+                      setSignUp((current) => ({ ...current, password: event.target.value }))
+                    }
                     placeholder="Use at least 8 characters"
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -350,6 +416,7 @@ export function AuthExperience() {
                       setSignUp((current) => ({ ...current, confirmPassword: event.target.value }))
                     }
                     placeholder="Re-enter your password"
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -365,7 +432,11 @@ export function AuthExperience() {
 
               {errors.form ? <p className="auth-error-banner">{errors.form}</p> : null}
 
-              <button type="submit" className="primary-button primary-button--full" disabled={isSubmitting}>
+              <button
+                type="submit"
+                className="primary-button primary-button--full"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Creating account..." : "Create account"}
               </button>
             </form>
@@ -384,7 +455,6 @@ export function AuthExperience() {
               {mode === "signin" ? "Sign up" : "Sign in"}
             </button>
           </p>
-
         </section>
       </div>
     </main>

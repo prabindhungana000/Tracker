@@ -73,7 +73,7 @@ FoodJourney is a modern, full-stack application architecture with three main com
 - **Runtime**: Node.js 18+
 - **Framework**: Express.js
 - **Database ORM**: Prisma
-- **Authentication**: JWT + bcrypt
+- **Authentication**: Supabase Auth with GitHub/email + backend token verification
 - **Real-time**: Socket.io
 - **Validation**: Zod
 - **Type Safety**: TypeScript strict mode
@@ -99,7 +99,7 @@ FoodJourney is a modern, full-stack application architecture with three main com
 │   └── notification.ts       - Push notifications
 │
 └── middleware/
-    ├── auth.ts          - JWT verification
+    ├── auth.ts          - Supabase token verification
     ├── validation.ts    - Request validation
     └── errorHandler.ts  - Centralized error handling
 ```
@@ -165,10 +165,8 @@ FlavorScore = (NutritionScore × 0.4) +
 
 #### Authentication
 ```
-POST   /api/auth/register
-POST   /api/auth/login
-POST   /api/auth/refresh
-POST   /api/auth/logout
+GET    /api/auth/me
+GET    /api/auth/providers
 ```
 
 #### Meals
@@ -240,9 +238,9 @@ GET    /api/user/achievements        - Get achievements
 ## Security Considerations
 
 ### Authentication
-- JWT tokens with short expiration (15 min)
-- Refresh tokens stored securely
-- Password hashing with bcrypt (10+ rounds)
+- Supabase-managed sessions and OAuth providers
+- Backend verifies Supabase access tokens before serving app data
+- Local app users are linked to Supabase identities for tracker persistence
 
 ### Authorization
 - Role-based access control (user levels can affect features)

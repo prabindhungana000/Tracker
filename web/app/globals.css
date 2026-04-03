@@ -318,6 +318,10 @@ a {
   gap: 0.75rem;
 }
 
+.auth-card--callback {
+  max-width: 32rem;
+}
+
 .auth-tab {
   display: inline-flex;
   align-items: center;
@@ -1467,10 +1471,6 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .auth-feature-grid {
-    grid-template-columns: 1fr;
-  }
-
   .activity-grid {
     grid-template-columns: 1fr;
   }
@@ -1497,10 +1497,6 @@ a {
 
   .auth-hero {
     display: block;
-  }
-
-  .auth-copy {
-    gap: 0.75rem;
   }
 
   .auth-copy h1 {

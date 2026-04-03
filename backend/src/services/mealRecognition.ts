@@ -123,7 +123,7 @@ export class MealRecognitionService {
       cheese: { calories: 402, protein: 25, carbs: 1.3, fat: 33, fiber: 0 },
     };
 
-    let totalNutrition = {
+    const totalNutrition = {
       calories: 0,
       protein: 0,
       carbs: 0,
