@@ -1,5 +1,4 @@
 import express from 'express';
-import { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -15,7 +14,6 @@ import {
 } from '../middleware/validation';
 
 const router = express.Router();
-const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
 
 type SerializableUser = {
   id: string;
