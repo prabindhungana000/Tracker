@@ -1,6 +1,5 @@
 import express from 'express';
 import { Prisma } from '@prisma/client';
-const { PrismaClientKnownRequestError } = Prisma;
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -16,6 +15,7 @@ import {
 } from '../middleware/validation';
 
 const router = express.Router();
+const PrismaClientKnownRequestError = Prisma.PrismaClientKnownRequestError;
 
 type SerializableUser = {
   id: string;
@@ -68,7 +68,7 @@ function serializeUser(user: {
   };
 }
 
-function getUniqueFieldError(error: PrismaClientKnownRequestError) {
+function getUniqueFieldError(error: any) {
   const target = Array.isArray(error.meta?.target) ? error.meta.target : [];
 
   if (target.includes('email')) {
@@ -148,8 +148,7 @@ router.post('/register', validateRequest(registerSchema), async (req, res) => {
     });
   } catch (error: any) {
     if (
-      error instanceof PrismaClientKnownRequestError &&
-      error.code === 'P2002'
+      error?.code === 'P2002'
     ) {
       const duplicate = getUniqueFieldError(error);
 
