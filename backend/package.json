@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "seed": "ts-node src/db/seed.ts",
     "lint": "eslint src",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postinstall": "npx prisma generate"
   },
   "dependencies": {
     "express": "^4.18.2",
