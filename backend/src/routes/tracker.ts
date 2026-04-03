@@ -1,5 +1,4 @@
 import express from 'express';
-import { randomUUID } from 'crypto';
 import { z } from 'zod';
 
 import prisma from '../lib/prisma';
@@ -82,8 +81,8 @@ function serializeTrackerState(record: {
   weightKg: number;
   mealsJson: string;
   burnsJson: string;
-  createdAt: string | Date;
-  updatedAt: string | Date;
+  createdAt: Date;
+  updatedAt: Date;
 }) {
   return {
     goal: record.goal,
@@ -91,97 +90,40 @@ function serializeTrackerState(record: {
     weightKg: record.weightKg,
     meals: parseEntries(record.mealsJson, []),
     burns: parseEntries(record.burnsJson, []),
-    createdAt: new Date(record.createdAt).toISOString(),
-    updatedAt: new Date(record.updatedAt).toISOString(),
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
   };
-}
-
-type TrackerStateRow = {
-  goal: number | null;
-  burnGoal: number | null;
-  weightKg: number;
-  mealsJson: string;
-  burnsJson: string;
-  createdAt: string | Date;
-  updatedAt: string | Date;
-};
-
-let trackerTableReadyPromise: Promise<void> | null = null;
-
-async function ensureTrackerTable() {
-  if (!trackerTableReadyPromise) {
-    trackerTableReadyPromise = (async () => {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "TrackerState" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "userId" TEXT NOT NULL,
-          "goal" INTEGER,
-          "burnGoal" INTEGER,
-          "weightKg" REAL NOT NULL DEFAULT 70,
-          "mealsJson" TEXT NOT NULL DEFAULT '[]',
-          "burnsJson" TEXT NOT NULL DEFAULT '[]',
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "TrackerState_userId_fkey"
-            FOREIGN KEY ("userId") REFERENCES "User" ("id")
-            ON DELETE CASCADE ON UPDATE CASCADE
-        )
-      `);
-
-      await prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "TrackerState_userId_key"
-        ON "TrackerState"("userId")
-      `);
-    })();
-  }
-
-  await trackerTableReadyPromise;
-}
-
-async function getTrackerStateRow(userId: string) {
-  const rows = await prisma.$queryRawUnsafe<TrackerStateRow[]>(
-    `
-      SELECT "goal", "burnGoal", "weightKg", "mealsJson", "burnsJson", "createdAt", "updatedAt"
-      FROM "TrackerState"
-      WHERE "userId" = ?
-      LIMIT 1
-    `,
-    userId
-  );
-
-  return rows[0] || null;
 }
 
 router.get('/', authMiddleware, async (req, res) => {
   const userId = (req.user as AuthTokenPayload).userId;
 
   try {
-    await ensureTrackerTable();
+    const existing = await prisma.trackerState.findUnique({
+      where: { userId },
+    });
 
-    await prisma.$executeRawUnsafe(
-      `
-        INSERT OR IGNORE INTO "TrackerState"
-          ("id", "userId", "goal", "burnGoal", "weightKg", "mealsJson", "burnsJson")
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-      randomUUID(),
-      userId,
-      DEFAULT_TRACKER_STATE.goal,
-      DEFAULT_TRACKER_STATE.burnGoal,
-      DEFAULT_TRACKER_STATE.weightKg,
-      JSON.stringify(DEFAULT_TRACKER_STATE.meals),
-      JSON.stringify(DEFAULT_TRACKER_STATE.burns)
-    );
-
-    const trackerState = await getTrackerStateRow(userId);
-
-    if (!trackerState) {
-      throw new Error('Tracker state was not created.');
+    if (existing) {
+      return res.json({
+        success: true,
+        data: serializeTrackerState(existing),
+      });
     }
+
+    const created = await prisma.trackerState.create({
+      data: {
+        userId,
+        goal: DEFAULT_TRACKER_STATE.goal,
+        burnGoal: DEFAULT_TRACKER_STATE.burnGoal,
+        weightKg: DEFAULT_TRACKER_STATE.weightKg,
+        mealsJson: JSON.stringify(DEFAULT_TRACKER_STATE.meals),
+        burnsJson: JSON.stringify(DEFAULT_TRACKER_STATE.burns),
+      },
+    });
 
     return res.json({
       success: true,
-      data: serializeTrackerState(trackerState),
+      data: serializeTrackerState(created),
     });
   } catch (error) {
     console.error('Tracker load error:', error);
@@ -204,39 +146,28 @@ router.put('/', authMiddleware, async (req, res) => {
   }
 
   try {
-    await ensureTrackerTable();
-
-    await prisma.$executeRawUnsafe(
-      `
-        INSERT INTO "TrackerState"
-          ("id", "userId", "goal", "burnGoal", "weightKg", "mealsJson", "burnsJson")
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT("userId") DO UPDATE SET
-          "goal" = excluded."goal",
-          "burnGoal" = excluded."burnGoal",
-          "weightKg" = excluded."weightKg",
-          "mealsJson" = excluded."mealsJson",
-          "burnsJson" = excluded."burnsJson",
-          "updatedAt" = CURRENT_TIMESTAMP
-      `,
-      randomUUID(),
-      userId,
-      parsed.data.goal,
-      parsed.data.burnGoal,
-      parsed.data.weightKg,
-      JSON.stringify(parsed.data.meals),
-      JSON.stringify(parsed.data.burns)
-    );
-
-    const trackerState = await getTrackerStateRow(userId);
-
-    if (!trackerState) {
-      throw new Error('Tracker state was not saved.');
-    }
+    const updated = await prisma.trackerState.upsert({
+      where: { userId },
+      update: {
+        goal: parsed.data.goal,
+        burnGoal: parsed.data.burnGoal,
+        weightKg: parsed.data.weightKg,
+        mealsJson: JSON.stringify(parsed.data.meals),
+        burnsJson: JSON.stringify(parsed.data.burns),
+      },
+      create: {
+        userId,
+        goal: parsed.data.goal,
+        burnGoal: parsed.data.burnGoal,
+        weightKg: parsed.data.weightKg,
+        mealsJson: JSON.stringify(parsed.data.meals),
+        burnsJson: JSON.stringify(parsed.data.burns),
+      },
+    });
 
     return res.json({
       success: true,
-      data: serializeTrackerState(trackerState),
+      data: serializeTrackerState(updated),
     });
   } catch (error) {
     console.error('Tracker save error:', error);
