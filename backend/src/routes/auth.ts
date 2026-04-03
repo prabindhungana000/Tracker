@@ -1,5 +1,5 @@
 import express from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClientKnownRequestError } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -67,7 +67,7 @@ function serializeUser(user: {
   };
 }
 
-function getUniqueFieldError(error: Prisma.PrismaClientKnownRequestError) {
+function getUniqueFieldError(error: PrismaClientKnownRequestError) {
   const target = Array.isArray(error.meta?.target) ? error.meta.target : [];
 
   if (target.includes('email')) {
@@ -145,9 +145,9 @@ router.post('/register', validateRequest(registerSchema), async (req, res) => {
         user: serializeUser(user),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error instanceof PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
       const duplicate = getUniqueFieldError(error);
@@ -206,7 +206,7 @@ router.post('/login', validateRequest(loginSchema), async (req, res) => {
         user: serializeUser(user),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auth login error:', error);
     return res.status(500).json({
       success: false,
@@ -242,7 +242,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         user: serializeUser(user),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auth me error:', error);
     return res.status(500).json({
       success: false,
